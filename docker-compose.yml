@@ -1,0 +1,67 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+
+  # 1. The Ollama Service
+  # This runs the large language model (Mistral) that your parser queries.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_llm
+    # To use GPU acceleration (if available), uncomment the next line:
+    # command: /bin/ollama serve
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    volumes:
+      # Store model weights persistently
+      - ollama_data:/root/.ollama
+    # Ollama must be accessible on your local network to download the model
+    # before the 'api' service can use it.
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # 2. The FastAPI API Service
+  api:
+    build: .
+    container_name: resume_parser_api
+    # Map the container port 8000 to the host port 8000
+    ports:
+      - "8000:8000"
+    # Pass Supabase credentials as environment variables
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      OLLAMA_HOST: http://ollama:11434
+    # IMPORTANT: The API container must wait for Ollama to be ready
+    depends_on:
+      ollama:
+        condition: service_started
+    # Wait for the Mistral model to be pulled and ready before starting the API
+    # This command first pulls the 'mistral' model, then runs uvicorn.
+    command: >
+      /bin/sh -c "
+        # 1. Wait briefly for ollama server to be online
+        sleep 10 &&
+
+        # 2. Pull the model using the Python client. 
+        # Note: We are using 'host' here, which works with recent ollama-python versions.
+        python -c 'from ollama import Client; Client(host=\"http://ollama:11434\").pull(\"mistral\")' &&
+
+        # 3. Start the API
+        uvicorn api:app --host 0.0.0.0 --port 8000
+      "
+    extra_hosts:
+      - "ollama:172.17.0.1" 
+
+volumes:
+  ollama_data:
