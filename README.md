@@ -17,7 +17,7 @@ You must have the following software installed:
 Clone the project to your local machine:
 
 ```bash
-git clone [https://github.com/SSanjay0614/resume-builder/](https://github.com/SSanjay0614/resume-builder.git)
+git clone https://github.com/SSanjay0614/resume-builder.git
 cd resume-builder
 ```
 
@@ -92,4 +92,5 @@ If you wish to remove the downloaded Mistral model (to free up disk space), use 
 ```bash
 docker compose down --volumes
 ```
+
 
